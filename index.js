@@ -31,8 +31,7 @@ delete require.cache[require.resolve('lodash')];
 /**
  * A default list of properties in the request object that are allowed to be logged.
  * These properties will be safely included in the meta of the log.
- * 'body' is not included in this list because it can contains passwords and stuff that are sensitive for logging.
- * TODO: Include 'body' and get the defaultRequestFilter to filter the inner properties like 'password' or 'password_confirmation', etc. Pull requests anyone?
+ * Use the blacklist option to hide sensitive data from body.
  * @type {Array}
  */
 exports.requestWhitelist = ['url', 'body', 'headers', 'method', 'httpVersion', 'originalUrl', 'query'];
@@ -205,7 +204,6 @@ function handleRoute(options, err, req, res, next) {
         var blacklist = _.union(options.bodyBlacklist, (req._routeBlacklists.body || []));
 
         var filteredBody = null;
-
         if ( req.body !== undefined ) {
             if (blacklist.length > 0 && bodyWhitelist.length === 0) {
                 var whitelist = _.difference(Object.keys(req.body), blacklist);
@@ -215,11 +213,16 @@ function handleRoute(options, err, req, res, next) {
             }
         }
 
-        if (filteredBody) logData.req.body = filteredBody;
+        if (filteredBody) {
+          logData.req.body = filteredBody;
+        } else {
+          delete logData.req.body;
+        }
 
-        var meta = err ? winston.exception.getAllInfo(err) : {}
+        var meta = err ? winston.exception.getAllInfo(err) || {} : {};
+
         if(options.meta !== false) {
-            meta = _.extend({}, meta, logData, options.baseMeta);
+            meta = _.extend(meta, logData, options.baseMeta);
 
             if (options.metaField) {
                 var newMeta = {}
