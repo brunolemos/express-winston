@@ -35,7 +35,7 @@ delete require.cache[require.resolve('lodash')];
  * TODO: Include 'body' and get the defaultRequestFilter to filter the inner properties like 'password' or 'password_confirmation', etc. Pull requests anyone?
  * @type {Array}
  */
-exports.requestWhitelist = ['url', 'headers', 'method', 'httpVersion', 'originalUrl', 'query'];
+exports.requestWhitelist = ['url', 'body', 'headers', 'method', 'httpVersion', 'originalUrl', 'query'];
 
 /**
  * A default list of properties in the request body that are allowed to be logged.
@@ -48,7 +48,7 @@ exports.bodyWhitelist = [];
  * A default list of properties in the request body that are not allowed to be logged.
  * @type {Array}
  */
-exports.bodyBlacklist = [];
+exports.bodyBlacklist = ['password'];
 
 /**
  * A default list of properties in the response object that are allowed to be logged.
@@ -155,7 +155,7 @@ function handleRoute(options, err, req, res, next) {
     var end = res.end;
     res.end = function(chunk, encoding) {
         res.responseTime = (new Date) - req._startTime;
-        req.url = req.originalUrl || req.url;
+        req.url = currentUrl;
 
         var requestWhitelist = options.requestWhitelist.concat(req._routeWhitelists.req || []);
         var responseWhitelist = options.responseWhitelist.concat(req._routeWhitelists.res || []);
