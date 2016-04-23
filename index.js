@@ -164,6 +164,7 @@ function handleRoute(options, err, req, res, next) {
         logData.req = filterObject(req, requestWhitelist, options.requestFilter) || {};
         logData.res = filterObject(res, responseWhitelist, options.responseFilter) || {};
         logData.err = err;
+        logData.responseTime = res.responseTime;
 
         res.end = end;
         res.end(chunk, encoding);
@@ -216,10 +217,9 @@ function handleRoute(options, err, req, res, next) {
 
         if (filteredBody) logData.req.body = filteredBody;
 
-        var meta = {};
+        var meta = err ? winston.exception.getAllInfo(err) : {}
         if(options.meta !== false) {
-            meta = _.extend(meta, err ? winston.exception.getAllInfo(err) : {}, logData, options.baseMeta);
-            meta.responseTime = res.responseTime;
+            meta = _.extend({}, meta, logData, options.baseMeta);
 
             if (options.metaField) {
                 var newMeta = {}
