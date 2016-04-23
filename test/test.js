@@ -91,7 +91,9 @@ function errorLoggerTestHelper(providedOptions) {
     req: null,
     res: null,
     transportOptions: null,
-    next: function () {}
+    next: function (err, req, res, next) {
+      res.end('{ "message": "Hi!  I\'m a chunk!" }');
+    }
   }, providedOptions);
 
   var req = mockReq(options.req);
@@ -110,8 +112,8 @@ function errorLoggerTestHelper(providedOptions) {
       transports: [new MockTransport(result, options.transportOptions)]
     }, options.loggerOptions));
 
-    middleware(options.originalError, req, res, function (pipelineError) {
-      options.next(pipelineError);
+    middleware(options.originalError, req, res, function (pipelineError, _req, _res, next) {
+      options.next(pipelineError, req, res, next);
       result.pipelineError = pipelineError;
       resolve(result);
     });

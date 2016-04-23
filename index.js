@@ -55,7 +55,7 @@ exports.bodyBlacklist = [];
  * These properties will be safely included in the meta of the log.
  * @type {Array}
  */
-exports.responseWhitelist = ['statusCode'];
+exports.responseWhitelist = ['statusCode', 'responseTime'];
 
 /**
  * A list of request routes that will be skipped instead of being logged. This would be useful if routes for health checks or pings would otherwise pollute
@@ -111,7 +111,7 @@ function filterObject(originalObj, whiteList, initialFilter) {
 
 
 /**
- * Handle route and prints log message 
+ * Handle route and prints log message
  * @return void
  */
 function handleRoute(options, err, req, res, next) {
@@ -123,10 +123,10 @@ function handleRoute(options, err, req, res, next) {
     options.responseFilter = options.responseFilter || exports.defaultResponseFilter;
     options.ignoredRoutes = options.ignoredRoutes || exports.ignoredRoutes;
     options.winstonInstance = options.winstonInstance || (new winston.Logger ({ transports: options.transports }));
-    options.level = options.level || "info";
+    options.level = options.level || (err ? 'error' : 'info');
     options.statusLevels = options.statusLevels || false;
     options.msg = options.msg || (err ? "middlewareError" : "HTTP {{req.method}} {{req.url}}");
-    options.meta = options.meta || false;
+    options.meta = options.meta !== false;
     options.baseMeta = options.baseMeta || {};
     options.metaField = options.metaField || null;
     options.colorize = options.colorize || false;
@@ -139,18 +139,15 @@ function handleRoute(options, err, req, res, next) {
     if (currentUrl && _.includes(options.ignoredRoutes, currentUrl)) return next();
     if (options.ignoreRoute(req, res)) return next();
 
-    var _routeWhitelists = {
+    req._routeWhitelists = {
         req: [],
         res: [],
         body: []
     };
 
-    var _routeBlacklists = {
+    req._routeBlacklists = {
         body: []
     };
-
-    var requestWhitelist = options.requestWhitelist.concat(_routeWhitelists.req || []);
-    var responseWhitelist = options.responseWhitelist.concat(_routeWhitelists.res || []);
 
     req._startTime = new Date;
 
@@ -158,14 +155,15 @@ function handleRoute(options, err, req, res, next) {
     var end = res.end;
     res.end = function(chunk, encoding) {
         res.responseTime = (new Date) - req._startTime;
+        req.url = req.originalUrl || req.url;
+
+        var requestWhitelist = options.requestWhitelist.concat(req._routeWhitelists.req || []);
+        var responseWhitelist = options.responseWhitelist.concat(req._routeWhitelists.res || []);
 
         var logData = {};
         logData.req = filterObject(req, requestWhitelist, options.requestFilter) || {};
         logData.res = filterObject(res, responseWhitelist, options.responseFilter) || {};
         logData.err = err;
-
-        logData.res.responseTime = res.responseTime;
-        logData.req.url = req.originalUrl || req.url;
 
         res.end = end;
         res.end(chunk, encoding);
@@ -185,25 +183,25 @@ function handleRoute(options, err, req, res, next) {
             logData.res.statusCode = chalk[colorStatus](res.statusCode);
         }
 
-        // if (_.includes(responseWhitelist, 'body')) {
+        if (_.includes(responseWhitelist, 'body')) {
             if (chunk) {
-            var isJson = (res._headers && res._headers['content-type']
-                && res._headers['content-type'].indexOf('json') >= 0);
+                var isJson = (res._headers && res._headers['content-type']
+                    && res._headers['content-type'].indexOf('json') >= 0);
 
-            if(isJson) {
-                if(chunk instanceof Buffer) {
-                logData.res.body = JSONB.parse(chunk);
+                if(isJson) {
+                    if(chunk instanceof Buffer) {
+                    logData.res.body = JSONB.parse(chunk);
+                    } else {
+                    logData.res.body = JSON.parse(chunk);
+                    }
                 } else {
-                logData.res.body = JSON.parse(chunk);
+                    logData.res.body =  chunk.toString();
                 }
-            } else {
-                logData.res.body =  chunk.toString();
             }
-            }
-        // }
+        }
 
-        var bodyWhitelist = _.union(options.bodyWhitelist, (_routeWhitelists.body || []));
-        var blacklist = _.union(options.bodyBlacklist, (_routeBlacklists.body || []));
+        var bodyWhitelist = _.union(options.bodyWhitelist, (req._routeWhitelists.body || []));
+        var blacklist = _.union(options.bodyBlacklist, (req._routeBlacklists.body || []));
 
         var filteredBody = null;
 
@@ -220,11 +218,8 @@ function handleRoute(options, err, req, res, next) {
 
         var meta = {};
         if(options.meta !== false) {
-            meta = _.extend(meta, options.baseMeta);
-
-            if(err) {
-                meta = _.extend(meta, winston.exception.getAllInfo(err) || {});
-            }
+            meta = _.extend(meta, err ? winston.exception.getAllInfo(err) : {}, logData, options.baseMeta);
+            meta.responseTime = res.responseTime;
 
             if (options.metaField) {
                 var newMeta = {}
@@ -241,7 +236,7 @@ function handleRoute(options, err, req, res, next) {
             interpolate: /\{\{(.+?)\}\}/g
         });
 
-        var msg = template({err: logData.err, req: logData.req, res: logData.res});
+        var msg = template(logData);
 
         if(options.colorize) {
             msg = chalk.grey(msg);
@@ -252,10 +247,10 @@ function handleRoute(options, err, req, res, next) {
             options.winstonInstance.log(options.level, msg, meta);
         }
     };
-    
+
     if (err) {
-        next(err) 
-    } else { 
+        next(err)
+    } else {
         next();
     }
 }
