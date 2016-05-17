@@ -54,7 +54,7 @@ exports.bodyBlacklist = ['password'];
  * These properties will be safely included in the meta of the log.
  * @type {Array}
  */
-exports.responseWhitelist = ['statusCode', 'responseTime'];
+exports.responseWhitelist = ['statusCode', 'responseTime', 'body'];
 
 /**
  * A list of request routes that will be skipped instead of being logged. This would be useful if routes for health checks or pings would otherwise pollute
