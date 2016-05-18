@@ -88,7 +88,7 @@ exports.defaultResponseFilter = function (res, propName) {
  * @return always false
  */
 exports.defaultSkip = function() {
-  return false;
+    return false;
 };
 
 function filterObject(originalObj, whiteList, initialFilter) {
@@ -168,6 +168,12 @@ function handleRoute(options, err, req, res, next) {
         res.end = end;
         res.end(chunk, encoding);
 
+        if (err && options.skip(err, req, res)) {
+            return;
+        } else if (!err && options.skip(req, res)) {
+            return;
+        }
+
         if (options.statusLevels) {
             if (res.statusCode >= 100) { options.level = options.statusLevels.success || "info"; }
             if (res.statusCode >= 400) { options.level = options.statusLevels.warn || "warn"; }
@@ -186,13 +192,13 @@ function handleRoute(options, err, req, res, next) {
         if (_.includes(responseWhitelist, 'body')) {
             if (chunk) {
                 var isJson = (res._headers && res._headers['content-type']
-                    && res._headers['content-type'].indexOf('json') >= 0);
+                && res._headers['content-type'].indexOf('json') >= 0);
 
                 if(isJson) {
                     if(chunk instanceof Buffer) {
-                    logData.res.body = JSONB.parse(chunk);
+                        logData.res.body = JSONB.parse(chunk);
                     } else {
-                    logData.res.body = JSON.parse(chunk);
+                        logData.res.body = JSON.parse(chunk);
                     }
                 } else {
                     logData.res.body =  chunk.toString();
@@ -214,9 +220,9 @@ function handleRoute(options, err, req, res, next) {
         }
 
         if (filteredBody) {
-          logData.req.body = filteredBody;
+            logData.req.body = filteredBody;
         } else {
-          delete logData.req.body;
+            delete logData.req.body;
         }
 
         var meta = err ? winston.exception.getAllInfo(err) || {} : {};
@@ -246,9 +252,7 @@ function handleRoute(options, err, req, res, next) {
         }
 
         // This is fire and forget, we don't want logging to hold up the request so don't wait for the callback
-        if (!options.skip(req, res)) {
-            options.winstonInstance.log(options.level, msg, meta);
-        }
+        options.winstonInstance.log(options.level, msg, meta);
     };
 
     if (err) {
