@@ -133,6 +133,8 @@ function handleRoute(options, err, req, res, next) {
     options.expressFormat = options.expressFormat || false;
     options.ignoreRoute = options.ignoreRoute || function () { return false; };
     options.skip = options.skip || exports.defaultSkip;
+    options.handleRequestOnlyOnce = options.handleRequestOnlyOnce || false;
+    options.preferHandleErrorRequest = options.preferHandleErrorRequest || true;
 
     var currentUrl = req.originalUrl || req.url;
     if (currentUrl && _.includes(options.ignoredRoutes, currentUrl)) return next();
@@ -172,6 +174,9 @@ function handleRoute(options, err, req, res, next) {
             return;
         } else if (!err && options.skip(req, res)) {
             return;
+        } else if (req.winston.totalToHandle > 1 && !req.winston.totalHandled && options.handleRequestOnlyOnce) {
+            if(!err && req.winston.requestHasError && options.preferHandleErrorRequest)
+                return;
         }
 
         if (options.statusLevels) {
@@ -225,10 +230,10 @@ function handleRoute(options, err, req, res, next) {
             delete logData.req.body;
         }
 
-        var meta = err ? winston.exception.getAllInfo(err) || {} : {};
+        var meta = {};
 
-        if(options.meta !== false) {
-            meta = _.extend(meta, logData, options.baseMeta);
+        if(options.meta) {
+            meta = _.extend(meta, err ? winston.exception.getAllInfo(err) || {} : {}, options.baseMeta);
 
             if (options.metaField) {
                 var newMeta = {}
@@ -253,9 +258,14 @@ function handleRoute(options, err, req, res, next) {
 
         // This is fire and forget, we don't want logging to hold up the request so don't wait for the callback
         options.winstonInstance.log(options.level, msg, meta);
+        req.winston.totalHandled = (req.winston.totalHandled || 0) + 1;
     };
 
+    req.winston = req.winston || {};
+    req.winston.totalHandled = req.winston.totalHandled || 0;
+    req.winston.totalToHandle = (req.winston.totalToHandle || 0) + 1;
     if (err) {
+        req.winston.requestHasError = true;
         next(err)
     } else {
         next();

@@ -87,7 +87,8 @@ Use `expressWinston.logger(options)` to create a middleware to log your HTTP req
     bodyWhitelist: [String] // Array of body properties to log. Overrides global bodyWhitelist for this instance
     bodyBlacklist: [String] // Array of body properties to omit from logs. Overrides global bodyBlacklist for this instance
     ignoredRoutes: [String] // Array of paths to ignore/skip logging. Overrides global ignoredRoutes for this instance
-
+    handleRequestOnlyOnce: [Boolean] // Prevent duplicating log for same request
+    preferHandleErrorRequest: [Boolean] // Complements handleRequestOnlyOnce. When both are true, only logs when err is received from express (err, req, res, next)
 ```
 
 ### Error Logging
